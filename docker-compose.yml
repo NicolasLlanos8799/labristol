@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: labristol_db
+    environment:
+      POSTGRES_DB: labristol
+      POSTGRES_USER: labristol
+      POSTGRES_PASSWORD: labristol123
+    ports:
+      - "5432:5432"
+    volumes:
+      - labristol_pgdata:/var/lib/postgresql/data
+
+volumes:
+  labristol_pgdata:
