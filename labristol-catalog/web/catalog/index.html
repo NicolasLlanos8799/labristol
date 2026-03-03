@@ -76,6 +76,13 @@
                 <strong id="checkoutTotal">€0.00</strong>
             </div>
 
+            <div id="checkoutError" class="checkout-error hidden"></div>
+
+            <div id="checkoutSuccess" class="checkout-success hidden">
+                <span class="success-icon">✅</span>
+                <p id="checkoutSuccessMessage"></p>
+            </div>
+
             <form id="checkoutForm" class="checkout-form">
                 <div class="form-group">
                     <label for="inputName">Nombre completo *</label>
@@ -102,9 +109,15 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="inputAddress">Dirección de envío</label>
-                    <input type="text" id="inputAddress" placeholder="Solo si seleccionas envío a domicilio" />
+                <div class="form-row">
+                    <div class="form-group" id="addressFormGroup">
+                        <label for="inputAddress">Dirección de envío *</label>
+                        <input type="text" id="inputAddress" placeholder="Ej: Calle Principal 123" />
+                    </div>
+                    <div class="form-group">
+                        <label for="inputDeliveryTime">Horario de recogida / entrega *</label>
+                        <input type="time" id="inputDeliveryTime" required />
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="inputNotes">Notas adicionales</label>

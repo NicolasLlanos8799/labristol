@@ -24,11 +24,16 @@
     const selectDelivery = document.getElementById("selectDelivery");
     const inputAddress = document.getElementById("inputAddress");
     const selectPayment = document.getElementById("selectPayment");
+    const inputDeliveryTime = document.getElementById("inputDeliveryTime");
     const inputNotes = document.getElementById("inputNotes");
     const checkoutItems = document.getElementById("checkoutItems");
     const checkoutTotal = document.getElementById("checkoutTotal");
     const checkoutCloseBtn = document.getElementById("checkoutCloseBtn");
     const confirmOrderBtn = document.getElementById("confirmOrderBtn");
+    const checkoutError = document.getElementById("checkoutError");
+    const checkoutSuccess = document.getElementById("checkoutSuccess");
+    const checkoutSuccessMessage = document.getElementById("checkoutSuccessMessage");
+    const addressFormGroup = document.getElementById("addressFormGroup");
 
     const CART_KEY = "labristol_cart_v1";
 
@@ -205,6 +210,18 @@
     // -------------------------
     // Funciones Modal Checkout
     // -------------------------
+    function showError(msg) {
+        if (!checkoutError) return;
+        checkoutError.textContent = msg;
+        checkoutError.classList.remove("hidden");
+    }
+
+    function hideError() {
+        if (!checkoutError) return;
+        checkoutError.textContent = "";
+        checkoutError.classList.add("hidden");
+    }
+
     function openCheckoutModal() {
         const cart = loadCart();
         const { total } = getCartTotals(cart);
@@ -212,6 +229,13 @@
         // Render summary
         checkoutItems.innerHTML = cart.map(it => `<div>${it.qty}x ${escapeHtml(it.title)} - ${formatEuro(it.price * it.qty)}</div>`).join("");
         checkoutTotal.textContent = formatEuro(total);
+
+        // Reset display states
+        checkoutForm.classList.remove("hidden");
+        document.querySelector(".checkout-total-summary").classList.remove("hidden");
+        checkoutSuccess.classList.add("hidden");
+        hideError();
+        handleDeliveryChange(); // Initialize address visibility
 
         checkoutOverlay.classList.remove("hidden");
         checkoutModal.classList.remove("hidden");
@@ -224,18 +248,48 @@
         checkoutModal.classList.add("hidden");
         checkoutModal.setAttribute("aria-hidden", "true");
         checkoutForm.reset();
+        hideError();
     }
 
     checkoutCloseBtn?.addEventListener("click", closeCheckoutModal);
     checkoutOverlay?.addEventListener("click", closeCheckoutModal);
 
+    function handleDeliveryChange() {
+        if (selectDelivery.value === "pickup") {
+            addressFormGroup.classList.add("hidden");
+            inputAddress.value = "";
+            inputAddress.required = false;
+        } else {
+            addressFormGroup.classList.remove("hidden");
+            inputAddress.required = true;
+        }
+    }
+
+    selectDelivery?.addEventListener("change", handleDeliveryChange);
+
     checkoutForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        hideError();
+
         const cart = loadCart();
         if (!cart.length) return;
 
+        // Custom validation for address
+        if (selectDelivery.value === "delivery" && !inputAddress.value.trim()) {
+            showError("La dirección de envío es obligatoria para pedidos a domicilio.");
+            inputAddress.focus();
+            return;
+        }
+
+        const deliveryTime = inputDeliveryTime.value.trim();
+        if (!deliveryTime) {
+            showError("El horario de recogida/entrega es obligatorio.");
+            inputDeliveryTime.focus();
+            return;
+        }
+
         confirmOrderBtn.disabled = true;
-        confirmOrderBtn.textContent = "Procesando...";
+        confirmOrderBtn.textContent = "Enviando...";
 
         const payload = {
             customer_name: inputName.value.trim(),
@@ -243,8 +297,14 @@
             delivery_method: selectDelivery.value,
             delivery_address: inputAddress.value.trim(),
             payment_method: selectPayment.value,
+            delivery_time: deliveryTime,
             notes: inputNotes.value.trim(),
-            items: cart,
+            items: cart.map(it => ({
+                product_id: it.id,
+                title: it.title,
+                unit_price: Number(it.price),
+                qty: it.qty
+            })),
             total: getCartTotals(cart).total
         };
 
@@ -254,17 +314,41 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
+
+            const contentType = res.headers.get("content-type");
+            let data;
+
+            if (contentType && contentType.includes("application/json")) {
+                data = await res.json();
+            } else {
+                const textData = await res.text();
+                data = { ok: false, error: textData.substring(0, 100) }; // Solo 100 chars del texto de error html
+            }
 
             if (res.ok && data.ok) {
-                alert(`¡Pedido procesado con éxito! (#${data.order_id})`);
+                checkoutForm.classList.add("hidden");
+                document.querySelector(".checkout-total-summary").classList.add("hidden");
+                checkoutSuccess.classList.remove("hidden");
+                checkoutSuccessMessage.textContent = `Pedido confirmado ✅ #${data.order_id}`;
+
                 clearCart();
-                closeCheckoutModal();
+                updateCartBadge();
+                cartDrawer.classList.add("hidden");
+                cartDrawer.setAttribute("aria-hidden", "true");
             } else {
-                alert("Error al procesar el pedido: " + (data.error || "Desconocido"));
+                // Formatting specific HTTP error visible in UI
+                let errorMessage = data.error || "Desconocido";
+                if (res.status === 404) {
+                    errorMessage = `(HTTP 404): Cannot POST /api/orders`;
+                } else if (res.status >= 500) {
+                    errorMessage = `(HTTP ${res.status}): ${errorMessage}`;
+                }
+
+                showError("Error al procesar el pedido: " + errorMessage);
             }
         } catch (error) {
-            alert("Error de conexión al procesar el pedido");
+            // Netwok errors
+            showError("Error de conexión al procesar el pedido");
         } finally {
             confirmOrderBtn.disabled = false;
             confirmOrderBtn.textContent = "Confirmar Pedido";

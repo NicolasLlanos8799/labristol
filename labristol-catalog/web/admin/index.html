@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Panel de Pedidos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+
+<body>
+    <header class="admin-header">
+        <div class="header-titles">
+            <h1>Panel de Pedidos</h1>
+            <div id="socketStatus" class="socket-status offline">● Offline</div>
+            <!-- Toggle Sonido -->
+            <button id="soundToggleBtn" class="sound-toggle-btn" type="button" aria-label="Activar sonido">
+                <span id="soundStatusBadge" class="sound-badge sound-off">Sound OFF</span>
+            </button>
+        </div>
+        <button id="refreshBtn" class="btn btn-secondary" type="button">Refrescar</button>
+    </header>
+
+    <nav class="admin-tabs" id="mainNav">
+        <!-- View selector -->
+        <button class="tab-btn active view-selector" data-view="orders">📦 Pedidos</button>
+        <button class="tab-btn view-selector" data-view="products">🍔 Productos</button>
+    </nav>
+
+    <nav class="admin-tabs" id="ordersFilterNav">
+        <!-- Status filter (only for orders view) -->
+        <button class="tab-btn active filter-btn" data-status="pending">Nuevos <span id="pendingBadge"
+                class="pending-badge hidden">0</span></button>
+        <button class="tab-btn filter-btn" data-status="in_kitchen">Cocina</button>
+        <button class="tab-btn filter-btn" data-status="ready">Listos</button>
+        <button class="tab-btn filter-btn" data-status="delivered">Entregados</button>
+        <button class="tab-btn filter-btn" data-status="cancelled">Cancelados</button>
+    </nav>
+
+    <main class="admin-main">
+        <!-- View: Orders -->
+        <div id="viewOrders">
+            <div id="ordersList" class="orders-list">
+                <!-- Carga renderizada de pedidos -->
+            </div>
+        </div>
+
+        <!-- View: Products -->
+        <div id="viewProducts" class="hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <label style="color:var(--text-muted); font-size:0.9rem;">Filtro:</label>
+                    <select id="productFilterSelect"
+                        style="padding: 0.5rem; border-radius:4px; background:var(--bg-card); color:#fff; border:1px solid var(--border-color);">
+                        <option value="all">Todos</option>
+                        <option value="true">Activos</option>
+                        <option value="false">Inactivos</option>
+                    </select>
+                </div>
+                <button id="addHeroProductBtn" class="btn btn-primary" style="flex:none; padding:0.6rem 1rem;">+ Nuevo
+                    producto</button>
+            </div>
+
+            <table class="items-table" style="background:var(--bg-card); border-radius:8px; overflow:hidden;">
+                <thead style="background:#2a2a2a;">
+                    <tr>
+                        <th style="padding:1rem;">ID</th>
+                        <th style="padding:1rem;">Título</th>
+                        <th style="padding:1rem;">Descripción</th>
+                        <th style="padding:1rem;" class="text-right">Precio</th>
+                        <th style="padding:1rem;">Estado</th>
+                        <th style="padding:1rem; text-align:center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="productsTableBody">
+                    <!-- Productos renderizados aquí -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Detalle Pedido -->
+    <div id="orderModalOverlay" class="modal-overlay hidden"></div>
+    <div id="orderModal" class="order-modal hidden" role="dialog" aria-hidden="true">
+        <div class="modal-header">
+            <h2 id="modalTitle">Pedido #...</h2>
+            <button id="closeModalBtn" class="close-btn" type="button" aria-label="Cerrar modal">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- Datos renderizados -->
+        </div>
+        <div class="modal-footer" id="modalFooter">
+            <!-- Action buttons -->
+        </div>
+    </div>
+
+    <!-- Modal Producto (Crear/Editar) -->
+    <div id="productModalOverlay" class="modal-overlay hidden"></div>
+    <div id="productModal" class="order-modal hidden" role="dialog" aria-hidden="true">
+        <div class="modal-header">
+            <h2 id="productModalTitle">Nuevo Producto</h2>
+            <button id="closeProductBtn" class="close-btn" type="button">✕</button>
+        </div>
+        <form id="productForm">
+            <div class="modal-body">
+                <div id="productError" style="color:var(--color-danger); margin-bottom:1rem; font-size:0.9rem;"
+                    class="hidden"></div>
+                <input type="hidden" id="prodId" value="">
+
+                <div style="margin-bottom:1rem;">
+                    <label
+                        style="display:block; margin-bottom:0.4rem; color:var(--text-muted); font-size:0.85rem;">Título
+                        *</label>
+                    <input type="text" id="prodTitle" required
+                        style="width:100%; padding:0.75rem; border-radius:6px; background:#121212; border:1px solid var(--border-color); color:#fff;">
+                </div>
+
+                <div style="margin-bottom:1rem;">
+                    <label
+                        style="display:block; margin-bottom:0.4rem; color:var(--text-muted); font-size:0.85rem;">Descripción</label>
+                    <textarea id="prodDesc" rows="3"
+                        style="width:100%; padding:0.75rem; border-radius:6px; background:#121212; border:1px solid var(--border-color); color:#fff; font-family:inherit; resize:vertical;"></textarea>
+                </div>
+
+                <div style="margin-bottom:1rem; display:flex; gap:1rem;">
+                    <div style="flex:1;">
+                        <label
+                            style="display:block; margin-bottom:0.4rem; color:var(--text-muted); font-size:0.85rem;">Precio
+                            (€) *</label>
+                        <input type="number" id="prodPrice" step="0.01" min="0.01" required
+                            style="width:100%; padding:0.75rem; border-radius:6px; background:#121212; border:1px solid var(--border-color); color:#fff;">
+                    </div>
+                    <div style="flex:1; display:flex; align-items:flex-end; padding-bottom:0.75rem;">
+                        <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; color:#fff;">
+                            <input type="checkbox" id="prodActive" checked style="width:18px; height:18px;">
+                            Producto Activo
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end;">
+                <button type="button" id="cancelProductBtn" class="btn btn-secondary"
+                    style="flex:none;">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="flex:none;">Guardar Producto</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Contenedor de Toasts -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" role="status"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/admin/admin.js"></script>
+</body>
+
+</html>
