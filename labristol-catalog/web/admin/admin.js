@@ -553,10 +553,11 @@
         e.preventDefault();
 
         const id = document.getElementById("prodId").value;
+        const rawPrice = document.getElementById("prodPrice").value.replace(',', '.').replace(/[^0-9.]/g, '');
         const payload = {
             title: document.getElementById("prodTitle").value.trim(),
             description: document.getElementById("prodDesc").value.trim(),
-            price: parseFloat(document.getElementById("prodPrice").value),
+            price: parseFloat(rawPrice),
             active: document.getElementById("prodActive").checked
         };
 

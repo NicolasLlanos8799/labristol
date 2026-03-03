@@ -241,6 +241,38 @@ app.get("/api/admin/products", async (req, res) => {
     }
 });
 
+app.post("/api/admin/products", async (req, res) => {
+    const { title, description, price, active } = req.body;
+
+    if (!title || title.trim().length < 2) {
+        return res.status(400).json({ error: "El título debe tener al menos 2 caracteres" });
+    }
+
+    const numPrice = Number(price);
+    if (!Number.isFinite(numPrice) || numPrice <= 0) {
+        return res.status(400).json({ error: "El precio debe ser un número mayor a 0" });
+    }
+
+    const isActive = active !== undefined ? Boolean(active) : true;
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO products (title, description, price, active)
+             VALUES ($1, $2, $3, $4) RETURNING *`,
+            [title.trim(), description || "", numPrice, isActive]
+        );
+
+        const newProduct = result.rows[0];
+
+        // Emitir a todos los clientes para refresco en tiempo real
+        io.emit("products:upsert", newProduct);
+
+        res.status(201).json(newProduct);
+    } catch (e) {
+        res.status(500).json({ error: "Error interno al crear producto" });
+    }
+});
+
 app.patch("/api/admin/products/:id", async (req, res) => {
     const productId = req.params.id;
     if (isNaN(Number(productId))) {
